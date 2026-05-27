@@ -1,0 +1,1699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orange Annotator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;700;800&display=swap');
+
+  :root {
+    --bg: #0e0f0f;
+    --surface: #161818;
+    --border: #2a2d2d;
+    --orange: #ff6b1a;
+    --green: #39d353;
+    --text: #e8e8e8;
+    --muted: #666;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* TOP BAR */
+  #topbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 14px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+
+  #topbar h1 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 14px;
+    color: var(--orange);
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+
+  .btn {
+    background: var(--border);
+    color: var(--text);
+    border: 1px solid #3a3d3d;
+    padding: 5px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .btn:hover { background: #333; border-color: var(--orange); color: var(--orange); }
+  .btn.primary { background: var(--orange); color: #000; border-color: var(--orange); font-weight: 700; }
+  .btn.primary:hover { background: #ff8c44; }
+  .btn.green { background: var(--green); color: #000; border-color: var(--green); font-weight: 700; }
+  .btn.green:hover { background: #55e870; }
+  .btn:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+
+  #frameInfo {
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: auto;
+    white-space: nowrap;
+  }
+  #frameInfo span { color: var(--text); font-weight: 600; }
+
+  /* CONFIG BAR */
+  #configBar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 14px;
+    background: #111;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+  #configBar label { color: var(--muted); }
+  #configBar input[type="text"] {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 3px 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    border-radius: 3px;
+    width: 110px;
+  }
+  #configBar input:focus { outline: none; border-color: var(--orange); }
+
+  #ghostToggle {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  #ghostToggle input { accent-color: var(--orange); cursor: pointer; }
+
+  /* MAIN LAYOUT */
+  #main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* SIDEBAR */
+  #sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #sidebarTitle {
+    padding: 8px 12px 6px;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    border-bottom: 1px solid var(--border);
+  }
+
+  #frameList {
+    flex: 1;
+    overflow-y: auto;
+    padding: 2px 0;
+  }
+  #frameList::-webkit-scrollbar { width: 4px; }
+  #frameList::-webkit-scrollbar-track { background: transparent; }
+  #frameList::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .frame-item {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px 4px 12px;
+    font-size: 11px;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    transition: all 0.1s;
+    color: var(--muted);
+    gap: 4px;
+  }
+  .frame-item:hover { background: #1e2020; color: var(--text); }
+  .frame-item.active { border-left-color: var(--orange); background: #1e2020; color: var(--text); }
+  .frame-item.counted { color: var(--green); }
+  .frame-item.counted.active { border-left-color: var(--green); }
+
+  .frame-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .frame-controls {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+
+  .fc-btn {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--border);
+    border: none;
+    border-radius: 3px;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.1s;
+    line-height: 1;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .fc-btn:hover { background: var(--orange); color: #000; }
+
+  .frame-count {
+    font-size: 10px;
+    min-width: 22px;
+    text-align: center;
+    padding: 1px 4px;
+    background: var(--border);
+    border-radius: 10px;
+    color: var(--text);
+  }
+  .frame-item.counted .frame-count { background: #1a3d22; color: var(--green); }
+
+  #sidebarFooter {
+    padding: 10px 12px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted);
+  }
+  #progressBar {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-top: 6px;
+    overflow: hidden;
+  }
+  #progressFill {
+    height: 100%;
+    background: var(--orange);
+    border-radius: 2px;
+    transition: width 0.3s;
+    width: 0%;
+  }
+
+  /* CANVAS */
+  #canvasWrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+
+  #canvasContainer {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    cursor: crosshair;
+    background: #080909;
+  }
+  #canvasContainer.panning { cursor: grab; }
+  #canvasContainer.panning:active { cursor: grabbing; }
+
+  canvas {
+    position: absolute;
+    top: 0; left: 0;
+    transform-origin: 0 0;
+  }
+
+  /* BOTTOM BAR */
+  #bottombar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 7px 14px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  #countDisplay {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--orange);
+    min-width: 40px;
+  }
+
+  #countLabel { font-size: 10px; color: var(--muted); }
+  .sep { width: 1px; height: 24px; background: var(--border); }
+
+  #shortcuts {
+    font-size: 10px;
+    color: var(--muted);
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .key {
+    display: inline-block;
+    background: var(--border);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--text);
+    font-size: 10px;
+  }
+
+  #zoomDisplay {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  #zoomDisplay span { color: var(--text); }
+
+  /* DROP ZONE */
+  #dropzone {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    z-index: 10;
+    background: var(--bg);
+  }
+
+  #dropzone h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--orange);
+  }
+  #dropzone p { font-size: 12px; color: var(--muted); text-align: center; line-height: 1.8; }
+
+  .drop-box {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 36px 50px;
+    text-align: center;
+    transition: border-color 0.2s;
+    cursor: pointer;
+  }
+  .drop-box:hover { border-color: var(--orange); }
+  .drop-icon { font-size: 44px; margin-bottom: 10px; }
+
+  .drop-note {
+    margin-top: 14px;
+    padding: 14px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 11px;
+    color: var(--muted);
+    text-align: left;
+    line-height: 1.8;
+    max-width: 400px;
+  }
+  .drop-note .key { margin: 0 2px; }
+
+  /* NOTIF */
+  #notif {
+    position: fixed;
+    bottom: 60px;
+    right: 20px;
+    background: var(--green);
+    color: #000;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    z-index: 100;
+  }
+  #notif.show { opacity: 1; }
+
+  /* RIGHT TIMER SIDEBAR */
+  #timerSidebar {
+    width: 130px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 12px;
+    gap: 10px;
+  }
+  #timerLabel {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    font-weight: 600;
+  }
+  #timerDisplay {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--orange);
+    letter-spacing: 0.05em;
+    margin: 4px 0;
+  }
+  #timerDisplay.running { color: var(--green); }
+  #timerSidebar .btn {
+    width: 100%;
+    text-align: center;
+    padding: 6px 0;
+  }
+  #timerNote {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    text-align: center;
+    margin-top: 4px;
+  }
+  #timerNote:focus { outline: none; border-color: var(--orange); }
+
+  /* SESSION RESTORE BANNER */
+  #sessionBanner {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 18px;
+    background: #0d2e18;
+    border-bottom: 2px solid var(--green);
+    font-size: 12px;
+    color: var(--green);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+  #sessionBanner.show { display: flex; }
+  #sessionBanner strong { color: #fff; }
+  #sessionBanner .btn { font-size: 11px; padding: 4px 10px; }
+  #sessionBannerIcon { font-size: 20px; }
+
+  /* EXPORT PROGRESS OVERLAY */
+  #exportOverlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+  }
+  #exportOverlay.show { display: flex; }
+  #exportOverlayBox {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 32px 40px;
+    text-align: center;
+    min-width: 320px;
+  }
+  #exportOverlayBox h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--orange);
+    margin-bottom: 8px;
+  }
+  #exportProgressText {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+  #exportProgressBarOuter {
+    height: 6px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  #exportProgressBarFill {
+    height: 100%;
+    background: var(--green);
+    border-radius: 4px;
+    transition: width 0.2s;
+    width: 0%;
+  }
+  #exportScopeRow {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    justify-content: center;
+  }
+  #exportScopeRow label {
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+  }
+  #exportScopeRow input { accent-color: var(--orange); }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <h1>🍊 ORANGE ANNOTATOR</h1>
+  <button class="btn" onclick="openFolder()">📁 Open Folder</button>
+  <button class="btn" onclick="openFiles()" style="font-size:10px;">Select Files</button>
+  <button class="btn" onclick="importXLSX()">📄 Import XLSX</button>
+  <button class="btn" onclick="saveProgress()">💾 Save Progress</button>
+  <button class="btn" onclick="loadProgress()">📂 Load Progress</button>
+  <button class="btn" id="btnPrev" onclick="changeFrame(-1)" disabled>◀ Prev</button>
+  <button class="btn" id="btnNext" onclick="changeFrame(1)" disabled>Next ▶</button>
+  <button class="btn" id="btnUndo" onclick="undoLast()" disabled>↩ Undo</button>
+  <button class="btn" id="btnClear" onclick="clearFrame()" disabled>✕ Clear</button>
+  <button class="btn primary" id="btnExport" onclick="exportXLSX()" disabled>⬇ Export XLSX</button>
+  <button class="btn green" id="btnExportImages" onclick="showExportImagesDialog()" disabled>📸 Export Images</button>
+  <button class="btn" id="btnDownloadFrame" onclick="downloadCurrentFrame()" disabled title="Download this frame with dots (shortcut: S)">⬇ Save Frame</button>
+  <div id="frameInfo">Frame <span id="fCurrent">—</span> / <span id="fTotal">—</span></div>
+</div>
+
+<!-- CONFIG BAR -->
+<div id="configBar">
+  <label>Tree ID:</label>
+  <input type="text" id="treeId" value="NoNumber01">
+  <label style="margin-left:10px;">Video ID:</label>
+  <input type="text" id="videoId" value="Vid 01">
+  <label id="ghostToggle" style="margin-left:14px;"><input type="checkbox" id="ghostCheck" checked> Ghost overlay</label>
+  <label style="margin-left:10px; color:var(--muted);">Ghost color:</label>
+  <select id="ghostColor" style="background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:11px;font-family:'JetBrains Mono',monospace;padding:2px 6px;border-radius:3px;cursor:pointer;">
+    <option value="magenta">Magenta</option>
+    <option value="cyan">Cyan</option>
+    <option value="yellow">Yellow</option>
+    <option value="red">Red</option>
+    <option value="white">White</option>
+  </select>
+  <label style="margin-left:14px;">Go to frame:</label>
+  <input type="text" id="frameSearch" placeholder="e.g. 150" style="width:60px;" onkeydown="if(event.key==='Enter'){jumpToFrame(this.value);this.blur();}">
+  <button class="btn" onclick="jumpToFrame(document.getElementById('frameSearch').value)" style="padding:3px 8px;font-size:10px;">Go</button>
+  <button class="btn" onclick="clearAutoSave()" style="padding:3px 8px;font-size:10px;margin-left:14px;color:var(--muted);" title="Clear auto-saved data for this session">🗑 Clear Save</button>
+</div>
+
+<!-- SESSION RESTORE BANNER -->
+<div id="sessionBanner">
+  <span id="sessionBannerIcon">💾</span>
+  <span id="sessionBannerText">Previous session found</span>
+  <button class="btn green" onclick="document.getElementById('sessionBanner').classList.remove('show'); openFolder();">
+    📁 Re-open Folder to Restore
+  </button>
+  <button class="btn" onclick="openFiles();" style="font-size:10px;">Select Files</button>
+  <button class="btn" onclick="dismissBanner()" style="margin-left:auto;color:var(--muted);">✕ Dismiss</button>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <div id="sidebarTitle">Frames</div>
+    <div id="frameList"></div>
+    <div id="sidebarFooter">
+      <div id="progressText">0 / 0 counted</div>
+      <div id="progressBar"><div id="progressFill"></div></div>
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+  <div id="canvasWrap">
+    <div id="canvasContainer">
+      <div id="dropzone">
+        <div class="drop-box" onclick="openFolder()">
+          <div class="drop-icon">📂</div>
+          <h2>Open Frames Folder</h2>
+          <p>Click to select your entire frames folder<br>
+          All images load sorted by frame number</p>
+        </div>
+        <div class="drop-note">
+          <strong style="color:var(--text);">Shortcuts:</strong><br>
+          <span class="key">← →</span> or <span class="key">A D</span> prev / next frame<br>
+          <span class="key">Ctrl+Z</span> undo last dot<br>
+          <span class="key">Alt+Click</span> remove nearest dot (auto-renumbers)<br>
+          <span class="key">Remove #</span> box → type number + Enter to remove by number<br>
+          <span class="key">Scroll</span> pan &nbsp;|&nbsp; <span class="key">Ctrl+Scroll</span> zoom &nbsp;|&nbsp; <span class="key">Shift+Drag</span> or <span class="key">Middle-Drag</span> pan<br>
+          <span class="key">C</span> clear frame &nbsp;|&nbsp; <span class="key">F</span> fit &nbsp;|&nbsp; <span class="key">S</span> save frame
+        </div>
+      </div>
+      <canvas id="mainCanvas"></canvas>
+    </div>
+
+    <!-- BOTTOM BAR -->
+    <div id="bottombar">
+      <div>
+        <div id="countDisplay">0</div>
+        <div id="countLabel">oranges this frame</div>
+      </div>
+      <div class="sep"></div>
+      <div id="shortcuts">
+        <span><span class="key">← → A D</span> prev/next</span>
+        <span><span class="key">Ctrl+Z</span> undo last</span>
+        <span><span class="key">Alt+Click</span> remove nearest</span>
+        <span><span class="key">Remove #</span> remove by number → renumbers</span>
+        <span><span class="key">Scroll</span> pan up/down</span>
+        <span><span class="key">Shift+Scroll</span> pan left/right</span>
+        <span><span class="key">Ctrl+Scroll</span> zoom</span>
+        <span><span class="key">Shift/Middle drag</span> pan</span>
+        <span><span class="key">C</span> clear frame</span>
+        <span><span class="key">F</span> fit to screen</span>
+        <span><span class="key">S</span> save frame</span>
+      </div>
+      <div class="sep"></div>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+        <span style="font-size:10px;color:var(--muted);">Remove #</span>
+        <input type="number" id="removeDotInput" min="1" placeholder="e.g. 10"
+          style="width:62px;background:var(--surface);border:1px solid var(--border);color:var(--text);
+                 font-family:'JetBrains Mono',monospace;font-size:11px;padding:3px 6px;border-radius:3px;"
+          onkeydown="if(event.key==='Enter'){removeDotByNumber(this.value);this.value='';}"
+          title="Type a dot number and press Enter (or click ✕) to remove it and renumber the rest">
+        <button class="btn" onclick="removeDotByNumber(document.getElementById('removeDotInput').value);document.getElementById('removeDotInput').value='';"
+          style="padding:3px 8px;" title="Remove that numbered dot">✕</button>
+      </div>
+      <div id="zoomDisplay">Zoom: <span id="zoomVal">100</span>%</div>
+      <div id="autoSaveStatus" style="font-size:10px;color:var(--muted);margin-left:10px;transition:color 0.4s;">
+        ● <span id="autoSaveText">not saved</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT SIDEBAR: TIMER -->
+  <div id="timerSidebar">
+    <div id="timerLabel">TIMER</div>
+    <div id="timerDisplay">00:00</div>
+    <button class="btn primary" id="timerToggle" onclick="toggleTimer()">▶ Start</button>
+    <button class="btn" id="timerReset" onclick="resetTimer()">Reset</button>
+    <input type="text" id="timerNote" placeholder="#">
+  </div>
+</div>
+
+<!-- Hidden inputs -->
+<input type="file" id="fileInput" multiple accept="image/*" style="display:none" onchange="handleFiles(this.files)">
+<input type="file" id="xlsxInput" accept=".xlsx,.xls" style="display:none" onchange="handleImportXLSX(this.files)">
+<input type="file" id="jsonInput" accept=".json" style="display:none" onchange="handleLoadProgress(this.files)">
+<div id="notif"></div>
+
+<!-- EXPORT IMAGES OVERLAY -->
+<div id="exportOverlay">
+  <div id="exportOverlayBox">
+    <h3 id="exportOverlayTitle">📸 Export Labeled Images</h3>
+    <div id="exportProgressText">Preparing...</div>
+    <div id="exportProgressBarOuter">
+      <div id="exportProgressBarFill"></div>
+    </div>
+    <div id="exportScopeRow" style="margin-top:16px;">
+      <label><input type="radio" name="exportScope" value="annotated" checked> Annotated only</label>
+      <label><input type="radio" name="exportScope" value="all"> All frames</label>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:4px;">
+      <button class="btn green" id="exportStartBtn" onclick="startExportImages()">Start Export</button>
+      <button class="btn" id="exportCancelBtn" onclick="cancelExport()">Cancel</button>
+    </div>
+    <div id="exportStatusMsg" style="font-size:11px;color:var(--muted);margin-top:10px;min-height:18px;"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+// ─── STATE ───
+let frames = [];
+let annotations = {};
+let currentFrame = 0;
+let zoom = 1;
+let panX = 0, panY = 0;
+let isPanning = false;
+let panStart = { x: 0, y: 0 };
+let shiftDown = false;
+let firstLoad = true;
+let exportCancelled = false;
+
+const canvas = document.getElementById('mainCanvas');
+const ctx = canvas.getContext('2d');
+const container = document.getElementById('canvasContainer');
+
+const GHOST_COLORS = {
+  magenta: { fill: 'rgba(255, 0, 255, 0.25)', stroke: 'rgba(255, 0, 255, 0.7)', text: 'rgba(255, 0, 255, 0.7)' },
+  cyan:    { fill: 'rgba(0, 255, 255, 0.25)', stroke: 'rgba(0, 255, 255, 0.7)', text: 'rgba(0, 255, 255, 0.7)' },
+  yellow:  { fill: 'rgba(255, 255, 0, 0.25)', stroke: 'rgba(255, 255, 0, 0.7)', text: 'rgba(255, 255, 0, 0.7)' },
+  red:     { fill: 'rgba(255, 0, 0, 0.25)', stroke: 'rgba(255, 0, 0, 0.7)', text: 'rgba(255, 0, 0, 0.7)' },
+  white:   { fill: 'rgba(255, 255, 255, 0.25)', stroke: 'rgba(255, 255, 255, 0.7)', text: 'rgba(255, 255, 255, 0.7)' },
+};
+
+// ─── FOLDER / FILE LOADING ───
+async function openFolder() {
+  try {
+    const dirHandle = await window.showDirectoryPicker();
+    const files = [];
+    for await (const entry of dirHandle.values()) {
+      if (entry.kind === 'file') {
+        const file = await entry.getFile();
+        if (file.type.startsWith('image/')) files.push(file);
+      }
+    }
+    if (!files.length) { alert('No image files found.'); return; }
+    processFiles(files);
+  } catch (e) {
+    if (e.name !== 'AbortError') alert('Folder picker not supported. Use "Select Files" instead, or use Chrome/Edge.');
+  }
+}
+
+function openFiles() { document.getElementById('fileInput').click(); }
+
+function handleFiles(fileList) {
+  const files = Array.from(fileList).filter(f => f.type.startsWith('image/'));
+  if (!files.length) { alert('No image files selected.'); return; }
+  processFiles(files);
+}
+
+function processFiles(files) {
+  files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  frames = files.map(f => ({ name: f.name, file: f, url: null, img: null }));
+  annotations = {};
+  for (let i = 0; i < frames.length; i++) annotations[i] = [];
+
+  autoDetectIds(files);
+
+  document.getElementById('dropzone').style.display = 'none';
+  document.getElementById('fTotal').textContent = frames.length;
+  firstLoad = true;
+
+  buildSidebar();
+  enableButtons();
+
+  // Try to restore previous session for this folder
+  const didRestore = autoRestore();
+  if (!didRestore) goToFrame(0);
+}
+
+function autoDetectIds(files) {
+  // Try first file's name — expected format: 483_Vid 01_F0001.jpg
+  // Tree ID is everything before the first _Vid
+  // Video ID is the "Vid XX" portion
+  const firstName = files[0].name;
+
+  // Primary pattern: {treeId}_Vid {vidNum}_F{frameNum}.ext
+  // e.g. 483_Vid 01_F0001.jpg  or  NoNumber01_Vid 02_F001.png
+  const primary = firstName.match(/^(.+?)_(Vid[\s_]?\d+)_F\d+/i);
+  if (primary) {
+    const treeId = primary[1].trim();
+    // Normalise "Vid01" / "Vid_01" / "Vid 01" → "Vid 01"
+    const vidRaw = primary[2].replace(/Vid[\s_]?(\d+)/i, (_, n) => `Vid ${n.padStart(2, '0')}`);
+    document.getElementById('treeId').value = treeId;
+    document.getElementById('videoId').value = vidRaw;
+    return;
+  }
+
+  // Fallback: scan all filenames for any Vid number
+  const allNames = files.map(f => f.name).join(' ');
+  const vidMatch = allNames.match(/Vid[\s_]?(\d+)/i);
+  // Tree ID fallback: leading digits or NoNumberXX before first underscore
+  const treeMatch = firstName.match(/^([^_]+)_/);
+  if (treeMatch) document.getElementById('treeId').value = treeMatch[1].trim();
+  if (vidMatch)  document.getElementById('videoId').value = `Vid ${vidMatch[1].padStart(2, '0')}`;
+}
+
+function enableButtons() {
+  ['btnPrev','btnNext','btnUndo','btnClear','btnExport','btnExportImages','btnDownloadFrame'].forEach(id => {
+    document.getElementById(id).disabled = false;
+  });
+}
+
+// ─── LAZY IMAGE LOADING ───
+async function loadFrameImage(idx) {
+  if (idx < 0 || idx >= frames.length) return null;
+  const f = frames[idx];
+  if (f.img) return f.img;
+  return new Promise((resolve) => {
+    if (!f.url) f.url = URL.createObjectURL(f.file);
+    const img = new Image();
+    img.onload = () => { f.img = img; resolve(img); };
+    img.onerror = () => resolve(null);
+    img.src = f.url;
+  });
+}
+
+// ─── SIDEBAR ───
+function buildSidebar() {
+  const list = document.getElementById('frameList');
+  list.innerHTML = '';
+  frames.forEach((f, i) => {
+    const div = document.createElement('div');
+    div.className = 'frame-item';
+    div.id = `fi-${i}`;
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'frame-name';
+    const shortName = f.name.replace(/\.[^.]+$/, '');
+    const frameNum = shortName.match(/(\d+)$/);
+    nameSpan.textContent = frameNum ? `F${frameNum[1].padStart(3,'0')}` : shortName;
+    nameSpan.onclick = () => goToFrame(i);
+
+    const controls = document.createElement('span');
+    controls.className = 'frame-controls';
+
+    const minusBtn = document.createElement('button');
+    minusBtn.className = 'fc-btn';
+    minusBtn.textContent = '−';
+    minusBtn.title = 'Decrease count';
+    minusBtn.onclick = (e) => { e.stopPropagation(); adjustCount(i, -1); };
+
+    const countSpan = document.createElement('span');
+    countSpan.className = 'frame-count';
+    countSpan.id = `fb-${i}`;
+    countSpan.textContent = '—';
+
+    const plusBtn = document.createElement('button');
+    plusBtn.className = 'fc-btn';
+    plusBtn.textContent = '+';
+    plusBtn.title = 'Increase count';
+    plusBtn.onclick = (e) => { e.stopPropagation(); adjustCount(i, 1); };
+
+    controls.appendChild(minusBtn);
+    controls.appendChild(countSpan);
+    controls.appendChild(plusBtn);
+
+    div.appendChild(nameSpan);
+    div.appendChild(controls);
+    list.appendChild(div);
+  });
+}
+
+function adjustCount(idx, delta) {
+  if (!annotations[idx]) annotations[idx] = [];
+  const current = annotations[idx].length;
+  if (delta > 0) {
+    annotations[idx].push({ x: -100, y: -100, manual: true });
+  } else if (delta < 0 && current > 0) {
+    annotations[idx].pop();
+  }
+  updateCountDisplay();
+  updateSidebar();
+  if (idx === currentFrame) renderFrame();
+  scheduleAutoSave();
+}
+
+function updateSidebar() {
+  const items = document.querySelectorAll('.frame-item');
+  items.forEach((el, i) => {
+    el.classList.remove('active');
+    if (i === currentFrame) el.classList.add('active');
+    const count = annotations[i] ? annotations[i].length : 0;
+    const badge = document.getElementById(`fb-${i}`);
+    if (badge) badge.textContent = count > 0 ? count : '—';
+    if (count > 0) el.classList.add('counted');
+    else el.classList.remove('counted');
+  });
+
+  const active = document.getElementById(`fi-${currentFrame}`);
+  if (active) active.scrollIntoView({ block: 'nearest' });
+
+  const counted = Object.values(annotations).filter(a => a.length > 0).length;
+  const total = frames.length;
+  document.getElementById('progressText').textContent = `${counted} / ${total} counted`;
+  document.getElementById('progressFill').style.width = total > 0 ? `${(counted / total) * 100}%` : '0%';
+}
+
+// ─── FRAME NAVIGATION ───
+async function goToFrame(idx) {
+  if (idx < 0 || idx >= frames.length) return;
+  currentFrame = idx;
+  document.getElementById('fCurrent').textContent = idx + 1;
+  updateCountDisplay();
+  updateSidebar();
+  scheduleAutoSave(); // save current frame position
+
+  const img = await loadFrameImage(idx);
+  if (!img) return;
+
+  loadFrameImage(idx + 1);
+  loadFrameImage(idx - 1);
+
+  if (firstLoad) { fitToScreen(); firstLoad = false; }
+  else renderFrame();
+}
+
+function fitToScreen() {
+  const f = frames[currentFrame];
+  if (!f || !f.img) return;
+  const cw = container.clientWidth, ch = container.clientHeight;
+  zoom = Math.min(cw / f.img.width, ch / f.img.height) * 0.95;
+  panX = (cw - f.img.width * zoom) / 2;
+  panY = (ch - f.img.height * zoom) / 2;
+  updateZoomDisplay();
+  renderFrame();
+}
+
+function changeFrame(dir) { goToFrame(currentFrame + dir); }
+
+function jumpToFrame(val) {
+  if (!frames.length) return;
+  val = val.trim().replace(/^[Ff]/, '');
+  const num = parseInt(val);
+  if (isNaN(num) || num < 1 || num > frames.length) {
+    showNotif(`Enter 1–${frames.length}`);
+    return;
+  }
+  goToFrame(num - 1);
+  showNotif(`Jumped to F${String(num).padStart(3,'0')}`);
+}
+
+// ─── RENDER ───
+function renderFrame() {
+  const f = frames[currentFrame];
+  if (!f || !f.img) return;
+
+  const img = f.img;
+  canvas.width = container.clientWidth;
+  canvas.height = container.clientHeight;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+  ctx.translate(panX, panY);
+  ctx.scale(zoom, zoom);
+  ctx.drawImage(img, 0, 0);
+
+  // Ghost overlay — ONLY previous frame
+  if (document.getElementById('ghostCheck').checked && currentFrame > 0) {
+    const prevDots = annotations[currentFrame - 1] || [];
+    const gc = GHOST_COLORS[document.getElementById('ghostColor').value] || GHOST_COLORS.magenta;
+    prevDots.forEach((dot, i) => {
+      if (dot.manual) return;
+      const r = 12 / zoom;
+      ctx.beginPath();
+      ctx.arc(dot.x, dot.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = gc.fill;
+      ctx.fill();
+      ctx.strokeStyle = gc.stroke;
+      ctx.lineWidth = 2.5 / zoom;
+      ctx.setLineDash([4 / zoom, 3 / zoom]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      const fs = Math.max(9, 12 / zoom);
+      ctx.font = `bold ${fs}px JetBrains Mono, monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+      ctx.lineWidth = 3 / zoom;
+      ctx.strokeText(i + 1, dot.x, dot.y);
+      ctx.fillStyle = gc.text;
+      ctx.fillText(i + 1, dot.x, dot.y);
+    });
+  }
+
+  // Current frame dots
+  const dots = annotations[currentFrame] || [];
+  dots.forEach((dot, i) => {
+    if (dot.manual) return;
+    const r = 9 / zoom;
+
+    ctx.beginPath();
+    ctx.arc(dot.x, dot.y, r * 1.6, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255, 107, 26, 0.12)';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(dot.x, dot.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255, 107, 26, 0.4)';
+    ctx.fill();
+    ctx.strokeStyle = '#ff6b1a';
+    ctx.lineWidth = 2 / zoom;
+    ctx.stroke();
+
+    const fs = Math.max(10, 13 / zoom);
+    ctx.font = `bold ${fs}px JetBrains Mono, monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+    ctx.lineWidth = 3 / zoom;
+    ctx.strokeText(i + 1, dot.x, dot.y);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(i + 1, dot.x, dot.y);
+  });
+
+  ctx.restore();
+}
+
+// ─── DRAW DOTS ONTO OFFSCREEN CANVAS AT FULL RESOLUTION ───
+function drawDotsOnCanvas(offCtx, imgWidth, imgHeight, dots) {
+  // Scale dot size relative to image dimensions so they're always visible
+  const shortEdge = Math.min(imgWidth, imgHeight);
+  const DOT_RADIUS = Math.max(12, shortEdge * 0.018);  // ~1.8% of short edge, min 12px
+  const FONT_SIZE  = Math.max(16, shortEdge * 0.025);  // ~2.5% of short edge, min 16px
+
+  dots.forEach((dot, i) => {
+    if (dot.manual) return;
+
+    // Outer glow
+    offCtx.beginPath();
+    offCtx.arc(dot.x, dot.y, DOT_RADIUS * 1.8, 0, Math.PI * 2);
+    offCtx.fillStyle = 'rgba(255, 107, 26, 0.18)';
+    offCtx.fill();
+
+    // Main dot
+    offCtx.beginPath();
+    offCtx.arc(dot.x, dot.y, DOT_RADIUS, 0, Math.PI * 2);
+    offCtx.fillStyle = 'rgba(255, 107, 26, 0.6)';
+    offCtx.fill();
+    offCtx.strokeStyle = '#ff6b1a';
+    offCtx.lineWidth = Math.max(2, DOT_RADIUS * 0.18);
+    offCtx.stroke();
+
+    // Number label — black outline for contrast, white fill
+    offCtx.font = `bold ${FONT_SIZE}px monospace`;
+    offCtx.textAlign = 'center';
+    offCtx.textBaseline = 'middle';
+    offCtx.strokeStyle = 'rgba(0,0,0,0.9)';
+    offCtx.lineWidth = Math.max(4, FONT_SIZE * 0.35);
+    offCtx.strokeText(i + 1, dot.x, dot.y);
+    offCtx.fillStyle = '#ffffff';
+    offCtx.fillText(i + 1, dot.x, dot.y);
+  });
+}
+
+// ─── EXPORT IMAGES DIALOG ───
+function showExportImagesDialog() {
+  if (!frames.length) return;
+  exportCancelled = false;
+  const annotatedCount = Object.values(annotations).filter(a => a.length > 0).length;
+  document.getElementById('exportOverlayTitle').textContent = '📸 Export Labeled Images';
+  document.getElementById('exportProgressText').textContent =
+    `${annotatedCount} annotated frame(s) · ${frames.length} total frame(s)`;
+  document.getElementById('exportProgressBarFill').style.width = '0%';
+  document.getElementById('exportStatusMsg').textContent = '';
+  document.getElementById('exportStartBtn').disabled = false;
+  document.getElementById('exportCancelBtn').textContent = 'Cancel';
+  document.getElementById('exportScopeRow').style.display = 'flex';
+  document.getElementById('exportOverlay').classList.add('show');
+}
+
+function cancelExport() {
+  exportCancelled = true;
+  document.getElementById('exportOverlay').classList.remove('show');
+}
+
+async function startExportImages() {
+  exportCancelled = false;
+  document.getElementById('exportStartBtn').disabled = true;
+  document.getElementById('exportScopeRow').style.display = 'none';
+  document.getElementById('exportCancelBtn').textContent = 'Cancel';
+
+  const scope = document.querySelector('input[name="exportScope"]:checked').value;
+  const treeId = document.getElementById('treeId').value || 'NoNumber01';
+  const videoId = document.getElementById('videoId').value || 'Vid 01';
+
+  // Determine which frame indices to export
+  let indices = [];
+  if (scope === 'annotated') {
+    indices = frames.map((_, i) => i).filter(i => annotations[i] && annotations[i].filter(d => !d.manual).length > 0);
+  } else {
+    indices = frames.map((_, i) => i);
+  }
+
+  if (indices.length === 0) {
+    document.getElementById('exportStatusMsg').textContent = 'No frames to export.';
+    document.getElementById('exportStartBtn').disabled = false;
+    document.getElementById('exportScopeRow').style.display = 'flex';
+    return;
+  }
+
+  const zip = new JSZip();
+  const folder = zip.folder('labeled_frames');
+
+  for (let n = 0; n < indices.length; n++) {
+    if (exportCancelled) break;
+
+    const i = indices[n];
+    const pct = Math.round(((n) / indices.length) * 100);
+    document.getElementById('exportProgressBarFill').style.width = pct + '%';
+    document.getElementById('exportProgressText').textContent =
+      `Processing ${n + 1} / ${indices.length}  —  ${frames[i].name}`;
+
+    // Load image if not already loaded
+    const img = await loadFrameImage(i);
+    if (!img) continue;
+
+    // Render to offscreen canvas at full image resolution
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = img.width;
+    offCanvas.height = img.height;
+    const offCtx = offCanvas.getContext('2d');
+
+    offCtx.drawImage(img, 0, 0);
+
+    const dots = (annotations[i] || []).filter(d => !d.manual);
+    drawDotsOnCanvas(offCtx, img.width, img.height, dots);
+
+    // Convert to PNG blob and add to zip
+    const blob = await new Promise(res => offCanvas.toBlob(res, 'image/png'));
+    const arrayBuffer = await blob.arrayBuffer();
+
+    const frameMatch = frames[i].name.match(/(\d+)/g);
+    const lastNum = frameMatch ? frameMatch[frameMatch.length - 1] : String(i + 1);
+    const frameId = `F${lastNum.padStart(3, '0')}`;
+    const filename = `${treeId}_${videoId.replace(/\s+/g,'')}_${frameId}_labeled.png`;
+
+    folder.file(filename, arrayBuffer);
+
+    // Yield to keep UI responsive
+    await new Promise(r => setTimeout(r, 0));
+  }
+
+  if (exportCancelled) {
+    document.getElementById('exportStatusMsg').textContent = 'Export cancelled.';
+    document.getElementById('exportProgressBarFill').style.width = '0%';
+    document.getElementById('exportStartBtn').disabled = false;
+    document.getElementById('exportScopeRow').style.display = 'flex';
+    return;
+  }
+
+  document.getElementById('exportProgressText').textContent = 'Compressing ZIP...';
+  document.getElementById('exportProgressBarFill').style.width = '95%';
+
+  const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 3 } });
+
+  document.getElementById('exportProgressBarFill').style.width = '100%';
+  document.getElementById('exportProgressText').textContent = `Done! ${indices.length} image(s) packaged.`;
+  document.getElementById('exportStatusMsg').textContent = 'Downloading ZIP...';
+  document.getElementById('exportCancelBtn').textContent = 'Close';
+
+  const url = URL.createObjectURL(zipBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${treeId}_${videoId.replace(/\s+/g,'')}_labeled_frames.zip`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  showNotif(`Exported ${indices.length} labeled image(s)!`);
+  setTimeout(() => {
+    document.getElementById('exportOverlay').classList.remove('show');
+    document.getElementById('exportStartBtn').disabled = false;
+    document.getElementById('exportScopeRow').style.display = 'flex';
+  }, 2000);
+}
+
+// ─── CLICK → ADD DOT or PAN ───
+canvas.addEventListener('mousedown', (e) => {
+  if (e.button === 1) {
+    e.preventDefault();
+    e.stopPropagation();
+    startPan(e);
+    return;
+  }
+  if (shiftDown && e.button === 0) { startPan(e); return; }
+  if (!frames.length) return;
+  if (e.button !== 0) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const cx = e.clientX - rect.left;
+  const cy = e.clientY - rect.top;
+  const ix = (cx - panX) / zoom;
+  const iy = (cy - panY) / zoom;
+
+  const img = frames[currentFrame].img;
+  if (!img || ix < 0 || iy < 0 || ix > img.width || iy > img.height) return;
+
+  if (e.altKey) {
+    removeNearestDot(ix, iy);
+  } else {
+    annotations[currentFrame].push({ x: ix, y: iy });
+    updateCountDisplay();
+    updateSidebar();
+    renderFrame();
+    scheduleAutoSave();
+  }
+});
+
+canvas.addEventListener('auxclick', (e) => { if (e.button === 1) e.preventDefault(); });
+container.addEventListener('mousedown', (e) => { if (e.button === 1) e.preventDefault(); });
+
+canvas.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  if (frames.length) changeFrame(1);
+});
+
+function removeDotByNumber(val) {
+  if (!frames.length) return;
+  const num = parseInt(val);
+  const dots = annotations[currentFrame];
+  if (isNaN(num) || num < 1 || num > dots.length) {
+    showNotif(`No dot #${num} on this frame`);
+    return;
+  }
+  // Find the nth real (non-manual) dot
+  let realCount = 0;
+  let targetIdx = -1;
+  for (let i = 0; i < dots.length; i++) {
+    if (!dots[i].manual) {
+      realCount++;
+      if (realCount === num) { targetIdx = i; break; }
+    }
+  }
+  if (targetIdx === -1) {
+    showNotif(`Dot #${num} not found`);
+    return;
+  }
+  dots.splice(targetIdx, 1);
+  updateCountDisplay();
+  updateSidebar();
+  renderFrame();
+  scheduleAutoSave();
+  showNotif(`Removed #${num} — renumbered`);
+}
+
+function removeNearestDot(ix, iy) {
+  const dots = annotations[currentFrame];
+  if (!dots.length) return;
+  let minDist = Infinity, minIdx = -1;
+  dots.forEach((d, i) => {
+    if (d.manual) return;
+    const dist = Math.hypot(d.x - ix, d.y - iy);
+    if (dist < minDist) { minDist = dist; minIdx = i; }
+  });
+  if (minIdx >= 0 && minDist < 40 / zoom) {
+    dots.splice(minIdx, 1);
+    updateCountDisplay();
+    updateSidebar();
+    renderFrame();
+    scheduleAutoSave();
+  }
+}
+
+function undoLast() {
+  if (!frames.length) return;
+  const dots = annotations[currentFrame];
+  if (dots.length) { dots.pop(); updateCountDisplay(); updateSidebar(); renderFrame(); scheduleAutoSave(); }
+}
+
+function clearFrame() {
+  if (!frames.length) return;
+  if (annotations[currentFrame].length > 0 && !confirm(`Clear all ${annotations[currentFrame].length} dots?`)) return;
+  annotations[currentFrame] = [];
+  updateCountDisplay();
+  updateSidebar();
+  renderFrame();
+}
+
+// ─── ZOOM ───
+container.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  if (!frames.length) return;
+
+  if (e.ctrlKey) {
+    // Ctrl+Scroll → ZOOM (centred on cursor)
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const delta = e.deltaY < 0 ? 1.12 : 0.89;
+    const newZoom = Math.min(Math.max(zoom * delta, 0.05), 15);
+    panX = mx - (mx - panX) * (newZoom / zoom);
+    panY = my - (my - panY) * (newZoom / zoom);
+    zoom = newZoom;
+    updateZoomDisplay();
+  } else {
+    // Normal scroll → PAN (deltaX = left/right, deltaY = up/down)
+    // Shift+Scroll forces deltaY into horizontal axis (mouse wheel users)
+    if (e.shiftKey) {
+      panX -= e.deltaY * 1.2;
+    } else {
+      panX -= e.deltaX * 1.2;
+      panY -= e.deltaY * 1.2;
+    }
+  }
+  renderFrame();
+}, { passive: false });
+
+// ─── PAN ───
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Shift') { shiftDown = true; container.classList.add('panning'); }
+  if (e.code === 'ArrowRight' || e.key === 'd' || e.key === 'D') { if (!e.target.matches('input,select')) { e.preventDefault(); changeFrame(1); } }
+  if (e.code === 'ArrowLeft' || e.key === 'a' || e.key === 'A') { if (!e.target.matches('input,select')) { e.preventDefault(); changeFrame(-1); } }
+  if (e.key === 'z' && e.ctrlKey) { e.preventDefault(); undoLast(); }
+  if ((e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.target.matches('input,select')) clearFrame();
+  if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.target.matches('input,select')) fitToScreen();
+  if ((e.key === 's' || e.key === 'S') && !e.ctrlKey && !e.target.matches('input,select')) downloadCurrentFrame();
+});
+
+document.addEventListener('keyup', (e) => {
+  if (e.key === 'Shift') { shiftDown = false; isPanning = false; container.classList.remove('panning'); }
+});
+
+function startPan(e) {
+  isPanning = true;
+  panStart = { x: e.clientX - panX, y: e.clientY - panY };
+}
+
+document.addEventListener('mousemove', (e) => {
+  if (!isPanning) return;
+  panX = e.clientX - panStart.x;
+  panY = e.clientY - panStart.y;
+  renderFrame();
+});
+
+document.addEventListener('mouseup', () => { isPanning = false; });
+
+// ─── HELPERS ───
+function updateCountDisplay() {
+  const count = (annotations[currentFrame] || []).length;
+  document.getElementById('countDisplay').textContent = count;
+}
+
+function updateZoomDisplay() {
+  document.getElementById('zoomVal').textContent = Math.round(zoom * 100);
+}
+
+function showNotif(msg) {
+  const el = document.getElementById('notif');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 1500);
+}
+
+document.getElementById('ghostCheck').addEventListener('change', renderFrame);
+document.getElementById('ghostColor').addEventListener('change', renderFrame);
+
+// ─── SAVE PROGRESS (JSON) ───
+function saveProgress() {
+  if (!frames.length) return;
+
+  const data = {
+    treeId: document.getElementById('treeId').value,
+    videoId: document.getElementById('videoId').value,
+    totalFrames: frames.length,
+    frameNames: frames.map(f => f.name),
+    annotations: {},
+    currentFrame: currentFrame,
+    savedAt: new Date().toISOString()
+  };
+
+  for (let i = 0; i < frames.length; i++) {
+    if (annotations[i] && annotations[i].length > 0) {
+      data.annotations[i] = annotations[i].map(d => ({ x: d.x, y: d.y, manual: d.manual || false }));
+    }
+  }
+
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const treeId = data.treeId || 'annotations';
+  const videoId = (data.videoId || '').replace(/\s+/g, '');
+  a.download = `${treeId}_${videoId}_progress.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  const counted = Object.values(annotations).filter(a => a.length > 0).length;
+  showNotif(`Saved! ${counted}/${frames.length} frames`);
+}
+
+// ─── LOAD PROGRESS (JSON) ───
+function loadProgress() {
+  if (!frames.length) { alert('Load your frames folder first, then load your progress file.'); return; }
+  document.getElementById('jsonInput').click();
+}
+
+function handleLoadProgress(fileList) {
+  if (!fileList.length) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+
+      if (data.treeId) document.getElementById('treeId').value = data.treeId;
+      if (data.videoId) document.getElementById('videoId').value = data.videoId;
+
+      let restored = 0;
+      if (data.annotations) {
+        for (const [idx, dots] of Object.entries(data.annotations)) {
+          const i = parseInt(idx);
+          if (i >= 0 && i < frames.length) {
+            annotations[i] = dots.map(d => ({ x: d.x, y: d.y, manual: d.manual || false }));
+            restored++;
+          }
+        }
+      }
+
+      const resumeFrame = data.currentFrame && data.currentFrame < frames.length ? data.currentFrame : 0;
+      updateSidebar();
+      updateCountDisplay();
+      goToFrame(resumeFrame);
+      showNotif(`Restored ${restored} frames — resuming at F${String(resumeFrame + 1).padStart(3,'0')}`);
+    } catch (err) {
+      alert('Error reading progress file: ' + err.message);
+    }
+  };
+  reader.readAsText(fileList[0]);
+  document.getElementById('jsonInput').value = '';
+}
+
+// ─── IMPORT XLSX ───
+function importXLSX() {
+  if (!frames.length) { alert('Load your frames folder first, then import the xlsx.'); return; }
+  document.getElementById('xlsxInput').click();
+}
+
+function handleImportXLSX(fileList) {
+  if (!fileList.length) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json(ws);
+
+      let matched = 0;
+      data.forEach(row => {
+        const count = parseInt(row.ground_truth_count || row['ground_truth_count'] || 0);
+        if (!count || count <= 0) return;
+
+        const frameId = row.frame_id || row['frame_id'] || '';
+        const frameNum = frameId.match(/(\d+)/);
+        if (!frameNum) return;
+        const idx = parseInt(frameNum[1]) - 1;
+
+        if (idx >= 0 && idx < frames.length) {
+          annotations[idx] = [];
+          for (let j = 0; j < count; j++) {
+            annotations[idx].push({ x: -100, y: -100, manual: true });
+          }
+          matched++;
+        }
+      });
+
+      updateSidebar();
+      updateCountDisplay();
+      renderFrame();
+      showNotif(`Imported ${matched} frame counts`);
+    } catch (err) {
+      alert('Error reading xlsx: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(fileList[0]);
+  document.getElementById('xlsxInput').value = '';
+}
+
+// ─── DOWNLOAD CURRENT FRAME ───
+async function downloadCurrentFrame() {
+  if (!frames.length) return;
+  const img = await loadFrameImage(currentFrame);
+  if (!img) return;
+
+  const offCanvas = document.createElement('canvas');
+  offCanvas.width = img.width;
+  offCanvas.height = img.height;
+  const offCtx = offCanvas.getContext('2d');
+  offCtx.drawImage(img, 0, 0);
+
+  const dots = (annotations[currentFrame] || []).filter(d => !d.manual);
+  drawDotsOnCanvas(offCtx, img.width, img.height, dots);
+
+  const treeId = document.getElementById('treeId').value || 'NoNumber01';
+  const videoId = document.getElementById('videoId').value || 'Vid 01';
+  const frameMatch = frames[currentFrame].name.match(/(\d+)/g);
+  const lastNum = frameMatch ? frameMatch[frameMatch.length - 1] : String(currentFrame + 1);
+  const frameId = `F${lastNum.padStart(3, '0')}`;
+  const filename = `${treeId}_${videoId.replace(/\s+/g, '')}_${frameId}_labeled.png`;
+
+  offCanvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    showNotif(`Saved ${frameId}!`);
+  }, 'image/png');
+}
+
+// ─── AUTO-SAVE / AUTO-RESTORE (localStorage) ───
+
+// On page load: scan localStorage for any saved sessions and show banner
+function checkForSavedSession() {
+  try {
+    let bestKey = null, bestData = null, bestTime = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith('orange_annotator__')) continue;
+      try {
+        const d = JSON.parse(localStorage.getItem(k));
+        const t = d.savedAt ? new Date(d.savedAt).getTime() : 0;
+        if (t > bestTime) { bestTime = t; bestKey = k; bestData = d; }
+      } catch(e) {}
+    }
+    if (!bestData) return;
+
+    const frameCount = bestData.frameNames ? bestData.frameNames.length : '?';
+    const annotatedCount = bestData.annotations ? Object.keys(bestData.annotations).length : 0;
+    const ago = timeSince(bestData.savedAt);
+    const treeId = bestData.treeId || '';
+    const videoId = bestData.videoId || '';
+
+    const banner = document.getElementById('sessionBanner');
+    document.getElementById('sessionBannerText').innerHTML =
+      `<strong>Saved session found:</strong> ${treeId} · ${videoId} · <strong>${annotatedCount} / ${frameCount}</strong> frames annotated · saved ${ago}`;
+    banner.classList.add('show');
+  } catch(e) {}
+}
+
+function dismissBanner() {
+  document.getElementById('sessionBanner').classList.remove('show');
+}
+
+function getSessionKey() {
+  // Key based on tree+video+frame count+first filename — unique enough per session
+  const treeId = document.getElementById('treeId').value || 'unknown';
+  const videoId = document.getElementById('videoId').value || 'unknown';
+  const firstName = frames.length ? frames[0].name : '';
+  return `orange_annotator__${treeId}__${videoId}__${frames.length}__${firstName}`;
+}
+
+function autoSave() {
+  if (!frames.length) return;
+  try {
+    const key = getSessionKey();
+    const data = {
+      treeId: document.getElementById('treeId').value,
+      videoId: document.getElementById('videoId').value,
+      frameNames: frames.map(f => f.name),
+      annotations: {},
+      currentFrame: currentFrame,
+      savedAt: new Date().toISOString()
+    };
+    for (let i = 0; i < frames.length; i++) {
+      if (annotations[i] && annotations[i].length > 0) {
+        data.annotations[i] = annotations[i].map(d => ({ x: d.x, y: d.y, manual: d.manual || false }));
+      }
+    }
+    localStorage.setItem(key, JSON.stringify(data));
+    setAutoSaveStatus('saved');
+  } catch(e) {
+    // localStorage might be full; fail silently
+    setAutoSaveStatus('error');
+  }
+}
+
+function autoRestore() {
+  if (!frames.length) return;
+  try {
+    const key = getSessionKey();
+    const raw = localStorage.getItem(key);
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+
+    // Verify frame names match (basic sanity check)
+    if (data.frameNames && data.frameNames.length === frames.length) {
+      const namesMatch = data.frameNames.every((name, i) => frames[i] && frames[i].name === name);
+      if (!namesMatch) return false;
+    }
+
+    let restored = 0;
+    if (data.annotations) {
+      for (const [idx, dots] of Object.entries(data.annotations)) {
+        const i = parseInt(idx);
+        if (i >= 0 && i < frames.length) {
+          annotations[i] = dots.map(d => ({ x: d.x, y: d.y, manual: d.manual || false }));
+          restored++;
+        }
+      }
+    }
+
+    if (restored > 0) {
+      updateSidebar();
+      updateCountDisplay();
+      // Jump back to where they left off
+      const resumeAt = (data.currentFrame != null && data.currentFrame < frames.length)
+        ? data.currentFrame : 0;
+      goToFrame(resumeAt);
+      const ago = timeSince(data.savedAt);
+      showNotif(`✅ Restored ${restored} frame(s) — saved ${ago}`);
+      setAutoSaveStatus('restored');
+      return true;
+    }
+    return false;
+  } catch(e) {
+    return false;
+  }
+}
+
+function clearAutoSave() {
+  if (!frames.length) return;
+  try {
+    const key = getSessionKey();
+    localStorage.removeItem(key);
+    setAutoSaveStatus('cleared');
+    showNotif('Auto-save cleared');
+  } catch(e) {}
+}
+
+function setAutoSaveStatus(state) {
+  const el = document.getElementById('autoSaveStatus');
+  const txt = document.getElementById('autoSaveText');
+  if (!el || !txt) return;
+  const states = {
+    saved:    { color: 'var(--green)',  label: 'auto-saved' },
+    restored: { color: 'var(--green)',  label: 'restored ✓' },
+    error:    { color: '#e05',          label: 'save failed' },
+    cleared:  { color: 'var(--muted)', label: 'cleared' },
+    saving:   { color: 'var(--orange)', label: 'saving…' },
+  };
+  const s = states[state] || { color: 'var(--muted)', label: state };
+  el.style.color = s.color;
+  txt.textContent = s.label;
+}
+
+function timeSince(isoStr) {
+  if (!isoStr) return 'recently';
+  const diff = Math.floor((Date.now() - new Date(isoStr)) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+  return `${Math.floor(diff/3600)}h ago`;
+}
+
+// Debounced auto-save — waits 800ms after last change before writing
+let autoSaveTimer = null;
+function scheduleAutoSave() {
+  setAutoSaveStatus('saving');
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(autoSave, 800);
+}
+
+// ─── EXPORT XLSX ───
+function exportXLSX() {
+  if (!frames.length) return;
+
+  const treeId = document.getElementById('treeId').value || 'NoNumber01';
+  const videoId = document.getElementById('videoId').value || 'Vid 01';
+
+  const rows = [['image_filename', 'tree_id', 'video_id', 'frame_id', 'ground_truth_count']];
+
+  frames.forEach((f, i) => {
+    const count = (annotations[i] || []).length;
+    const frameMatch = f.name.match(/(\d+)/g);
+    const lastNum = frameMatch ? frameMatch[frameMatch.length - 1] : String(i + 1);
+    const frameId = `F${lastNum.padStart(3, '0')}`;
+    const imgName = `${treeId}_${videoId}_${frameId}.jpg`;
+    rows.push([imgName, treeId, videoId, frameId, count > 0 ? count : '']);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{ wch: 38 }, { wch: 16 }, { wch: 12 }, { wch: 10 }, { wch: 22 }];
+
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Ground Truth Labels');
+
+  const filename = `${treeId}_${videoId.replace(/\s+/g, '')}_ground_truth.xlsx`;
+  XLSX.writeFile(wb, filename);
+  showNotif('XLSX exported!');
+}
+
+// ─── RESIZE ───
+window.addEventListener('resize', () => { if (frames.length) renderFrame(); });
+
+// ─── TIMER ───
+let timerInterval = null;
+let timerSeconds = 0;
+let timerRunning = false;
+
+function toggleTimer() {
+  if (timerRunning) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+    timerRunning = false;
+    document.getElementById('timerToggle').textContent = '▶ Start';
+    document.getElementById('timerDisplay').classList.remove('running');
+  } else {
+    timerRunning = true;
+    document.getElementById('timerToggle').textContent = '■ Stop';
+    document.getElementById('timerDisplay').classList.add('running');
+    timerInterval = setInterval(() => {
+      timerSeconds++;
+      updateTimerDisplay();
+    }, 1000);
+  }
+}
+
+function resetTimer() {
+  clearInterval(timerInterval);
+  timerInterval = null;
+  timerRunning = false;
+  timerSeconds = 0;
+  document.getElementById('timerToggle').textContent = '▶ Start';
+  document.getElementById('timerDisplay').classList.remove('running');
+  updateTimerDisplay();
+}
+
+function updateTimerDisplay() {
+  const h = Math.floor(timerSeconds / 3600);
+  const m = Math.floor((timerSeconds % 3600) / 60);
+  const s = timerSeconds % 60;
+  const display = h > 0
+    ? `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+    : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  document.getElementById('timerDisplay').textContent = display;
+}
+
+// ─── ON PAGE LOAD ───
+window.addEventListener('load', () => {
+  checkForSavedSession();
+});
+</script>
+</body>
+</html>
