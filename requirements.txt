@@ -1,0 +1,46 @@
+# ============================================================
+# Zero-Shot Green Orange Detection — Python Dependencies
+# ============================================================
+# Python 3.8+ recommended (tested with CUDA-enabled PyTorch)
+#
+# Install order matters for detectron2:
+#   1. Install torch + torchvision first (see note below)
+#   2. Then: pip install -r requirements.txt
+#
+# PyTorch / CUDA:
+#   Install manually from https://pytorch.org/get-started/locally/
+#   e.g. pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+# ============================================================
+
+# --- Core scientific stack ---
+numpy<2.0                  # Hard constraint: detectron2 was compiled against NumPy 1.x
+pandas
+scipy
+scikit-learn
+scikit-image               # Installed alongside scikit-learn/scipy in several notebooks
+
+# --- Image & vision ---
+Pillow
+opencv-python
+torchvision                # Usually installed with torch; listed for completeness
+timm                       # Used in MAE notebook (ViT-B/16)
+
+# --- Object detection framework ---
+# detectron2 must be installed separately — version depends on your torch/CUDA:
+#   CUDA:  pip install detectron2 -f https://dl.fbaipublicfiles.com/detectron2/wheels/cu<VER>/torch<VER>/index.html
+#   CPU:   pip install git+https://github.com/facebookresearch/detectron2.git
+# detectron2
+
+# --- Data I/O ---
+openpyxl                   # Required by pandas for .xlsx read/write
+
+# --- Utilities ---
+tqdm
+tabulate
+gdown                      # Model checkpoint download (CuVLER notebook)
+faiss-cpu                  # Vector search (CuVLER; faiss-gpu used if available but falls back to cpu)
+pycocotools                # COCO annotation utilities (MAE notebook)
+
+# --- Code style (installed in CutLER notebook setup, not imported at runtime) ---
+colored
+black
